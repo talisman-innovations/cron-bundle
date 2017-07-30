@@ -33,6 +33,7 @@ class CronScanCommand extends BaseCommand
 
         $this->addOption('keep-deleted', 'k', InputOption::VALUE_NONE, 'If set, deleted cron jobs will not be removed');
         $this->addOption('default-disabled', 'd', InputOption::VALUE_NONE, 'If set, new jobs will be disabled by default');
+        $this->addOption('keep-period', 'p', InputOption::VALUE_NONE, 'If set, dont update period');
     }
 
     /**
@@ -42,6 +43,7 @@ class CronScanCommand extends BaseCommand
     {
         $keepDeleted = $input->getOption("keep-deleted");
         $defaultDisabled = $input->getOption("default-disabled");
+        $keepPeriod = $input->getOption("keep-period");
 
         // Enumerate the known jobs
         $jobRepo = $this->getCronJobRepository();
@@ -68,10 +70,9 @@ class CronScanCommand extends BaseCommand
                         $currentJob = $jobRepo->findOneByCommand($job, $counter);
                         $currentJob->setDescription($command->getDescription());
 
-                        $schedule = $annotation->value;
-                        $schedule = str_replace('\\', '', $schedule);
+                        $schedule = str_replace('\\', '', $annotation->value);
 
-                        if ($currentJob->getPeriod() != $schedule) {
+                        if ($currentJob->getPeriod() != $schedule && !$keepPeriod) {
                             $currentJob->setPeriod($schedule);
                             $currentJob->calculateNextRun();
                             $output->writeln('Updated interval for ' . $job . ' to ' . $schedule);
