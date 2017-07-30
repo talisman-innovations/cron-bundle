@@ -18,8 +18,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @package Shapecode\Bundle\CronBundle\Command
  * @author  Nikita Loges
  */
-class CronRunCommand extends BaseCommand
-{
+class CronRunCommand extends BaseCommand {
 
     /** @inheritdoc */
     protected $commandName = 'shapecode:cron:run';
@@ -30,8 +29,7 @@ class CronRunCommand extends BaseCommand
     /**
      * @inheritdoc
      */
-    protected function configure()
-    {
+    protected function configure() {
         parent::configure();
 
         $this->addArgument('job', InputArgument::OPTIONAL, 'Run only this job (if enabled)');
@@ -40,8 +38,7 @@ class CronRunCommand extends BaseCommand
     /**
      * @inheritdoc
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
-    {
+    protected function execute(InputInterface $input, OutputInterface $output) {
         $this->getStopWatch()->start('cronjobs');
 
         $jobRepo = $this->getCronJobRepository();
@@ -55,7 +52,6 @@ class CronRunCommand extends BaseCommand
                 }
             } catch (\Exception $e) {
                 $output->writeln('Couldn\'t find a job by the name of ' . $jobName);
-
                 return CronJobResult::FAILED;
             }
         } else {
@@ -65,25 +61,10 @@ class CronRunCommand extends BaseCommand
         $jobCount = count($jobsToRun);
         $output->writeln('Running ' . $jobCount . ' jobs:');
 
-        // Update the job with it's next scheduled time
-        $now = new \DateTime();
-        foreach ($jobsToRun as $job) {
-            $job->calculateNextRun();
-            $job->setLastUse($now);
-
-            $this->getEntityManager()->persist($job);
-        }
-
-        // flush the calculated runs
-        $this->getEntityManager()->flush();
-
         // Run the jobs
         foreach ($jobsToRun as $job) {
             $this->runJob($job, $output);
         }
-
-        // Flush our results to the DB
-        $this->getEntityManager()->flush();
 
         $this->getStopWatch()->stop('cronjobs');
 
@@ -98,8 +79,13 @@ class CronRunCommand extends BaseCommand
      *
      * @return string
      */
-    protected function runJob(CronJob $job, OutputInterface $output)
-    {
+    protected function runJob(CronJob $job, OutputInterface $output) {
+        // Update the job with it's next scheduled time
+        $now = new \DateTime();
+        $job->calculateNextRun();
+        $job->setLastUse($now);
+        $this->getEntityManager()->flush();
+
         $command = $job->getCommand();
         $watch = 'job-' . $command;
 
@@ -123,12 +109,18 @@ class CronRunCommand extends BaseCommand
         $this->getStopWatch()->start($watch);
         try {
             $statusCode = $commandToRun->run($emptyInput, $jobOutput);
-        } catch (\Exception $ex) {
+        } catch (\Throwable $th) {
+            $statusCode = CronJobResult::FAILED;
+            $jobOutput->writeln('');
+            $jobOutput->writeln('Job execution failed with error ' . get_class($th) . ':');
+        } 
+        catch (\Exception $ex) {
             $statusCode = CronJobResult::FAILED;
             $jobOutput->writeln('');
             $jobOutput->writeln('Job execution failed with exception ' . get_class($ex) . ':');
 //            $jobOutput->writeln($ex->__toString());
         }
+        
         $this->getStopWatch()->stop($watch);
 
         if (is_null($statusCode)) {
@@ -161,8 +153,7 @@ class CronRunCommand extends BaseCommand
      * @param         $output
      * @param         $statusCode
      */
-    protected function recordJobResult(CronJob $job, $timeTaken, $output, $statusCode)
-    {
+    protected function recordJobResult(CronJob $job, $timeTaken, $output, $statusCode) {
         $className = $this->getCronJobResultRepository()->getClassName();
 
         /** @var CronJobResultInterface $result */
@@ -173,13 +164,13 @@ class CronRunCommand extends BaseCommand
         $result->setStatusCode($statusCode);
 
         $this->getEntityManager()->persist($result);
+        $this->getEntityManager()->flush();
     }
 
     /**
      * @return Stopwatch
      */
-    protected function getStopWatch()
-    {
+    protected function getStopWatch() {
         return $this->getContainer()->get('debug.stopwatch');
     }
 

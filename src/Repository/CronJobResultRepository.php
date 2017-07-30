@@ -28,7 +28,7 @@ class CronJobResultRepository extends EntityRepository implements CronJobResultR
         $qb->setParameter('createdAt', new \DateTime('7 days ago'));
 
         if ($job) {
-            $qb->andWhere($expr->eq('r.cronJob', ':cronJob'));
+            $qb->andWhere($expr->eq('d.cronJob', ':cronJob'));
             $qb->setParameter('cronJob', $job->getId());
         }
 

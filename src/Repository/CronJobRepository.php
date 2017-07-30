@@ -59,6 +59,7 @@ class CronJobRepository extends EntityRepository implements CronJobRepositoryInt
 
         $qb->andWhere($expr->lte('p.nextRun', ':time'));
         $qb->andWhere($expr->eq('p.enable', ':enabled'));
+        $qb->orderBy('p.nextRun');
 
         $qb->setParameter('time', new \DateTime());
         $qb->setParameter('enabled', true);
