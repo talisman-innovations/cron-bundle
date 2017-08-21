@@ -96,8 +96,6 @@ class CronRunCommand extends BaseCommand {
         } catch (\InvalidArgumentException $ex) {
             $output->writeln(' skipped (command no longer exists)');
             $this->recordJobResult($job, 0, 'Command no longer exists', CronJobResult::SKIPPED);
-
-            // No need to reschedule non-existant commands
             return;
         }
 
@@ -107,33 +105,29 @@ class CronRunCommand extends BaseCommand {
         $jobOutput = new BufferedOutput();
 
         $this->getStopWatch()->start($watch);
+        
         try {
             $statusCode = $commandToRun->run($emptyInput, $jobOutput);
         } catch (\Throwable $th) {
-            $statusCode = CronJobResult::FAILED;
+            $statusCode = 1;
             $jobOutput->writeln('');
             $jobOutput->writeln('Job execution failed with error ' . get_class($th) . ':');
         } 
         catch (\Exception $ex) {
-            $statusCode = CronJobResult::FAILED;
+            $statusCode = 1;
             $jobOutput->writeln('');
             $jobOutput->writeln('Job execution failed with exception ' . get_class($ex) . ':');
-//            $jobOutput->writeln($ex->__toString());
         }
         
         $this->getStopWatch()->stop($watch);
 
-        if (is_null($statusCode)) {
-            $statusCode = 0;
-        }
-
-        $statusStr = CronJobResult::FAILED;
         switch ($statusCode) {
             case 0:
+                $statusCode = 0;
                 $statusStr = CronJobResult::SUCCEEDED;
                 break;
-            case 2:
-                $statusStr = CronJobResult::SKIPPED;
+            default:
+                $statusStr = CronJobResult::FAILED;
                 break;
         }
 
