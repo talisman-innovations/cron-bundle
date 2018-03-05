@@ -17,18 +17,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 class CronJobEditCommand extends BaseCommand
 {
 
-    /** @var string */
-    protected $commandName = 'shapecode:cron:edit';
-
-    /** @var string */
-    protected $commandDescription = 'Changes the status of a cron job';
-
     /**
      * @inheritdoc
      */
     protected function configure()
     {
-        parent::configure();
+        $this->setName('shapecode:cron:edit');
+        $this->setDescription('Changes the status of a cron job');
 
         $this->addArgument("job", InputArgument::REQUIRED, 'Name of the job to disable');
         $this->addOption('enable', 'e', InputOption::VALUE_REQUIRED, 'Enable or disable this cron (y or n)');
@@ -43,6 +38,8 @@ class CronJobEditCommand extends BaseCommand
         $jobRepo = $this->getCronJobRepository();
         $jobs = $jobRepo->findByCommand($jobName);
 
+        $em = $this->getManager();
+
         if (!count($jobs)) {
             $output->writeln("Couldn't find a job by the name of " . $jobName);
 
@@ -53,10 +50,10 @@ class CronJobEditCommand extends BaseCommand
 
         foreach ($jobs as $job) {
             $job->setEnable($enable);
-            $this->getEntityManager()->persist($job);
+            $em->persist($job);
         }
 
-        $this->getEntityManager()->flush();
+        $em->flush();
 
         if ($enable) {
             $output->writeln('cron enabled');

@@ -1,43 +1,34 @@
 <?php
 
-namespace Shapecode\Bundle\CronBundle\Entity\Interfaces;
+namespace Shapecode\Bundle\CronBundle\Entity;
 
 use Doctrine\Common\Collections\Collection;
-use Shapecode\Bundle\CronBundle\Entity\CronJobResult;
 
 /**
  * Class CronJobInterface
- * @package Shapecode\Bundle\CronBundle\Entity\Interfaces
- * @author Nikita Loges
- * @date 02.02.2015
+ *
+ * @package Shapecode\Bundle\CronBundle\Entity
+ * @author  Nikita Loges
  */
 interface CronJobInterface extends AbstractEntityInterface
 {
 
     /**
-     * Set command
-     *
      * @param string $command
      */
     public function setCommand($command);
 
     /**
-     * Get command
-     *
      * @return string
      */
     public function getCommand();
 
     /**
-     * Set description
-     *
      * @param string $description
      */
     public function setDescription($description);
 
     /**
-     * Get description
-     *
      * @return string
      */
     public function getDescription();
@@ -53,57 +44,46 @@ interface CronJobInterface extends AbstractEntityInterface
     public function setNumber($number);
 
     /**
-     * Set Period
-     *
      * @param string $period
      */
     public function setPeriod($period);
 
     /**
-     * Get Period
-     *
      * @return string
      */
     public function getPeriod();
 
     /**
-     * Set nextRun
-     *
      * @param \DateTime $nextRun
      */
-    public function setNextRun($nextRun);
+    public function setNextRun(\DateTime $nextRun);
 
     /**
-     * Get nextRun
-     *
      * @return \DateTime
      */
     public function getNextRun();
 
     /**
-     * Get results
-     *
      * @return Collection|CronJobResult[]
      */
     public function getResults();
 
     /**
-     * @param CronJobResult $result
+     * @param CronJobResultInterface $result
+     *
      * @return bool
      */
-    public function hasResult(CronJobResult $result);
+    public function hasResult(CronJobResultInterface $result);
 
     /**
-     * Add result
-     *
-     * @param CronJobResult $result
+     * @param CronJobResultInterface $result
      */
-    public function addResult(CronJobResult $result);
+    public function addResult(CronJobResultInterface $result);
 
     /**
-     * @param CronJobResult $result
+     * @param CronJobResultInterface $result
      */
-    public function removeResult(CronJobResult $result);
+    public function removeResult(CronJobResultInterface $result);
 
     /**
      * @param boolean $enable

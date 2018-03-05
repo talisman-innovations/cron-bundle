@@ -1,11 +1,12 @@
 <?php
 
-namespace Shapecode\Bundle\CronBundle\Entity\Interfaces;
+namespace Shapecode\Bundle\CronBundle\Entity;
 
 /**
  * Class AbstractEntityInterface
- * @package Shapecode\Bundle\CronBundle\Entity\Interfaces
- * @author Nikita Loges
+ *
+ * @package Shapecode\Bundle\CronBundle\Entity
+ * @author  Nikita Loges
  */
 interface AbstractEntityInterface
 {
@@ -49,9 +50,4 @@ interface AbstractEntityInterface
      * @return \DateTime
      */
     public function getUpdatedAt();
-
-    /**
-     * Sets created and updated by default
-     */
-    public function setCreatedAtAndUpdatedAtValue();
 }

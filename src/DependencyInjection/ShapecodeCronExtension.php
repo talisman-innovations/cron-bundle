@@ -2,8 +2,7 @@
 
 namespace Shapecode\Bundle\CronBundle\DependencyInjection;
 
-use Shapecode\Bundle\CronBundle\Entity\Interfaces\CronJobInterface;
-use Shapecode\Bundle\CronBundle\Entity\Interfaces\CronJobResultInterface;
+use Shapecode\Bundle\CronBundle\Entity as BundleEntities;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
@@ -33,16 +32,13 @@ class ShapecodeCronExtension extends Extension implements PrependExtensionInterf
      */
     public function prepend(ContainerBuilder $container)
     {
-        $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
-        $loader->load('entity.yml');
-
-        $doctrine['orm'] = [
-            'resolve_target_entities' => [
-                CronJobInterface::class  => '%shapecode_cron.target_entity_resolver.cron_job.class%',
-                CronJobResultInterface::class => '%shapecode_cron.target_entity_resolver.cron_job_result.class%',
+        $container->prependExtensionConfig('doctrine', [
+            'orm' => [
+                'resolve_target_entities' => [
+                    BundleEntities\CronJobInterface::class       => BundleEntities\CronJob::class,
+                    BundleEntities\CronJobResultInterface::class => BundleEntities\CronJobResult::class,
+                ]
             ]
-        ];
-
-        $container->prependExtensionConfig('doctrine', $doctrine);
+        ]);
     }
 }

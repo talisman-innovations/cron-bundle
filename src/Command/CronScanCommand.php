@@ -2,13 +2,17 @@
 
 namespace Shapecode\Bundle\CronBundle\Command;
 
-use Shapecode\Bundle\CronBundle\Annotation\CronJob as CronJobAnnotation;
+use Doctrine\Common\Annotations\Reader;
+use Doctrine\Common\Persistence\ManagerRegistry;
+use Shapecode\Bundle\CronBundle\Entity\CronJobInterface;
 use Shapecode\Bundle\CronBundle\Entity\CronJobResult;
-use Shapecode\Bundle\CronBundle\Entity\Interfaces\CronJobInterface;
+use Shapecode\Bundle\CronBundle\Manager\CronJobManagerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\KernelInterface;
 
 /**
  * Class CronScanCommand
@@ -18,22 +22,28 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class CronScanCommand extends BaseCommand
 {
-    /** @inheritdoc */
-    protected $commandName = 'shapecode:cron:scan';
 
-    /** @inheritdoc */
-    protected $commandDescription = 'Scans for any new or deleted cron jobs';
+    /** @var CronJobManagerInterface */
+    protected $cronJobManager;
+
+    public function __construct(CronJobManagerInterface $manager, KernelInterface $kernel, Reader $annotationReader, ManagerRegistry $registry, RequestStack $requestStack)
+    {
+        $this->cronJobManager = $manager;
+
+        parent::__construct($kernel, $annotationReader, $registry, $requestStack);
+    }
 
     /**
      * @inheritdoc
      */
     protected function configure()
     {
-        parent::configure();
+        $this->setName('shapecode:cron:scan');
+        $this->setDescription('Scans for any new or deleted cron jobs');
 
         $this->addOption('keep-deleted', 'k', InputOption::VALUE_NONE, 'If set, deleted cron jobs will not be removed');
         $this->addOption('default-disabled', 'd', InputOption::VALUE_NONE, 'If set, new jobs will be disabled by default');
-        $this->addOption('keep-period', 'p', InputOption::VALUE_NONE, 'If set, dont update period');
+        $this->addOption('keep-period', 'p', InputOption::VALUE_NONE, 'If set, dont update the period for jobs');
     }
 
     /**
@@ -48,39 +58,36 @@ class CronScanCommand extends BaseCommand
         // Enumerate the known jobs
         $jobRepo = $this->getCronJobRepository();
         $knownJobs = $jobRepo->getKnownJobs()->toArray();
+        $em = $this->getManager();
 
-        // Enumerate all the jobs currently loaded
-        $reader = $this->getReader();
+        $counter = [];
+        foreach ($this->getCronManager()->getJobs() as $jobMetadata) {
+            $command = $jobMetadata->getCommand();
+            $name = $command->getName();
 
-        foreach ($this->getApplication()->all() as $command) {
-            // Check for an @CronJob annotation
-            $reflClass = new \ReflectionClass($command);
+            $schedule = str_replace('\\', '', $jobMetadata->getExpression());
 
-            $counter = 0;
-            foreach ($reader->getClassAnnotations($reflClass) as $annotation) {
-                $counter++;
-                if ($annotation instanceof CronJobAnnotation) {
-                    $job = $command->getName();
+            if (!isset($counter[$name])) {
+                $counter[$name] = 0;
+            }
 
-                    if (in_array($job, $knownJobs)) {
-                        // Clear it from the known jobs so that we don't try to delete it
-                        unset($knownJobs[array_search($job, $knownJobs)]);
+            $counter[$name]++;
 
-                        // Update the job if necessary
-                        $currentJob = $jobRepo->findOneByCommand($job, $counter);
-                        $currentJob->setDescription($command->getDescription());
+            if (in_array($name, $knownJobs)) {
+                // Clear it from the known jobs so that we don't try to delete it
+                unset($knownJobs[array_search($name, $knownJobs)]);
 
-                        $schedule = str_replace('\\', '', $annotation->value);
+                // Update the job if necessary
+                $currentJob = $jobRepo->findOneByCommand($name, $counter[$name]);
+                $currentJob->setDescription($command->getDescription());
 
-                        if ($currentJob->getPeriod() != $schedule && !$keepPeriod) {
-                            $currentJob->setPeriod($schedule);
-                            $currentJob->calculateNextRun();
-                            $output->writeln('Updated interval for ' . $job . ' to ' . $schedule);
-                        }
-                    } else {
-                        $this->newJobFound($output, $command, $annotation, $defaultDisabled, $counter);
-                    }
+                if ($currentJob->getPeriod() != $schedule && !$keepPeriod) {
+                    $currentJob->setPeriod($schedule);
+                    $currentJob->calculateNextRun();
+                    $output->writeln('Updated interval for ' . $name . ' to ' . $schedule);
                 }
+            } else {
+                $this->newJobFound($output, $command, $schedule, $defaultDisabled, $counter[$name]);
             }
         }
 
@@ -90,12 +97,12 @@ class CronScanCommand extends BaseCommand
                 $output->writeln('Deleting job: ' . $deletedJob);
                 $jobsToDelete = $jobRepo->findByCommand($deletedJob);
                 foreach ($jobsToDelete as $jobToDelete) {
-                    $this->getEntityManager()->remove($jobToDelete);
+                    $em->remove($jobToDelete);
                 }
             }
         }
 
-        $this->getEntityManager()->flush();
+        $em->flush();
         $output->writeln("Finished scanning for cron jobs");
 
         return CronJobResult::SUCCEEDED;
@@ -104,15 +111,12 @@ class CronScanCommand extends BaseCommand
     /**
      * @param OutputInterface   $output
      * @param Command           $command
-     * @param CronJobAnnotation $annotation
+     * @param string            $schedule
      * @param bool              $defaultDisabled
      * @param                   $counter
      */
-    protected function newJobFound(OutputInterface $output, Command $command, CronJobAnnotation $annotation, $defaultDisabled = false, $counter)
+    protected function newJobFound(OutputInterface $output, Command $command, $schedule, $defaultDisabled = false, $counter)
     {
-        $schedule = $annotation->value;
-        $schedule = str_replace('\\', '', $schedule);
-
         $className = $this->getCronJobRepository()->getClassName();
 
         /** @var CronJobInterface $newJob */
@@ -125,6 +129,15 @@ class CronScanCommand extends BaseCommand
         $newJob->calculateNextRun();
 
         $output->writeln("Added the job " . $newJob->getCommand() . " with period " . $newJob->getPeriod());
-        $this->getEntityManager()->persist($newJob);
+
+        $this->getManager()->persist($newJob);
+    }
+
+    /**
+     * @return CronJobManagerInterface
+     */
+    protected function getCronManager()
+    {
+        return $this->cronJobManager;
     }
 }

@@ -1,11 +1,11 @@
 <?php
+
 namespace Shapecode\Bundle\CronBundle\Entity;
 
 use Cron\CronExpression;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Shapecode\Bundle\CronBundle\Entity\Interfaces\CronJobInterface;
 
 /**
  * Class CronJob
@@ -57,7 +57,7 @@ class CronJob extends AbstractEntity implements CronJobInterface
 
     /**
      * @var Collection|CronJobResult[]
-     * @ORM\OneToMany(targetEntity="CronJobResult", mappedBy="cronJob", cascade={"persist", "remove"}, orphanRemoval=true)
+     * @ORM\OneToMany(targetEntity="Shapecode\Bundle\CronBundle\Entity\CronJobResultInterface", mappedBy="cronJob", cascade={"persist", "remove"}, orphanRemoval=true)
      */
     protected $results;
 
@@ -181,7 +181,7 @@ class CronJob extends AbstractEntity implements CronJobInterface
     /**
      * @inheritdoc
      */
-    public function setNextRun($nextRun)
+    public function setNextRun(\DateTime $nextRun)
     {
         $this->nextRun = $nextRun;
     }
@@ -205,7 +205,7 @@ class CronJob extends AbstractEntity implements CronJobInterface
     /**
      * @inheritdoc
      */
-    public function hasResult(CronJobResult $result)
+    public function hasResult(CronJobResultInterface $result)
     {
         return $this->getResults()->contains($result);
     }
@@ -213,7 +213,7 @@ class CronJob extends AbstractEntity implements CronJobInterface
     /**
      * @inheritdoc
      */
-    public function addResult(CronJobResult $result)
+    public function addResult(CronJobResultInterface $result)
     {
         if (!$this->hasResult($result)) {
             $result->setCronJob($this);
@@ -224,7 +224,7 @@ class CronJob extends AbstractEntity implements CronJobInterface
     /**
      * @inheritdoc
      */
-    public function removeResult(CronJobResult $result)
+    public function removeResult(CronJobResultInterface $result)
     {
         if ($this->hasResult($result)) {
             $this->getResults()->removeElement($result);
